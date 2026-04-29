@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
             VentaKingTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Greeting(
-                        name = "Android",
+                        name = "WALTER POR FIN ME AHORRO EL DOLOR DE CABEZA xd",
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
