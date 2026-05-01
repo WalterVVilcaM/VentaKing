@@ -43,6 +43,13 @@ interface ProductoRapidoDao {
     suspend fun desactivar(id: String, actualizadoEn: Long)
 
     @Query("""
+        UPDATE productos_rapidos
+        SET estaActivo = 1, actualizadoEn = :actualizadoEn
+        WHERE id = :id
+    """)
+    suspend fun reactivar(id: String, actualizadoEn: Long)
+
+    @Query("""
         SELECT COUNT(*) FROM productos_rapidos
         WHERE negocioId = :negocioId
     """)

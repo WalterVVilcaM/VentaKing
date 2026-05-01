@@ -31,7 +31,7 @@ import com.ventaking.app.datos.local.entidades.VentaEntity
         ConfiguracionAppEntity::class
     ],
     version = 1,
-    exportSchema = true
+    exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
