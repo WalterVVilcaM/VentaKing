@@ -24,6 +24,14 @@ class VentaRepositoryImpl(
         historialVentaDao.insertar(historialVenta.toEntity())
     }
 
+    override suspend fun obtenerVentaPorId(ventaId: String): Venta? {
+        return ventaDao.obtenerPorId(ventaId)?.toDomain()
+    }
+
+    override suspend fun actualizarVenta(venta: Venta) {
+        ventaDao.actualizar(venta.toEntity())
+    }
+
     override fun observarVentasPorNegocioYFecha(
         negocioId: String,
         fechaVenta: String

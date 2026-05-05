@@ -18,12 +18,16 @@ import com.ventaking.app.dominio.casos.productos.EditarProductoUseCase
 import com.ventaking.app.dominio.casos.productos.ObtenerProductosPorNegocioUseCase
 import com.ventaking.app.dominio.casos.productos.ReactivarProductoUseCase
 import com.ventaking.app.dominio.casos.ventas.CalcularTotalVentaUseCase
+import com.ventaking.app.dominio.casos.ventas.CancelarVentaUseCase
+import com.ventaking.app.dominio.casos.ventas.EditarVentaUseCase
+import com.ventaking.app.dominio.casos.ventas.ObtenerVentasDelDiaUseCase
 import com.ventaking.app.dominio.casos.ventas.RegistrarHistorialVentaUseCase
 import com.ventaking.app.dominio.casos.ventas.RegistrarVentaUseCase
 import com.ventaking.app.presentacion.navegacion.AppNavigation
 import com.ventaking.app.presentacion.pantallas.configuracion.ConfiguracionViewModel
 import com.ventaking.app.presentacion.pantallas.productos.ProductosViewModel
 import com.ventaking.app.presentacion.pantallas.venta.VentaViewModel
+import com.ventaking.app.presentacion.pantallas.ventas_dia.VentasDiaViewModel
 import com.ventaking.app.presentacion.tema.TemaVentaKing
 import kotlinx.coroutines.launch
 
@@ -95,6 +99,25 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private val obtenerVentasDelDiaUseCase: ObtenerVentasDelDiaUseCase by lazy {
+        ObtenerVentasDelDiaUseCase(
+            ventaRepository = ventaRepository
+        )
+    }
+
+    private val editarVentaUseCase: EditarVentaUseCase by lazy {
+        EditarVentaUseCase(
+            ventaRepository = ventaRepository,
+            calcularTotalVentaUseCase = calcularTotalVentaUseCase
+        )
+    }
+
+    private val cancelarVentaUseCase: CancelarVentaUseCase by lazy {
+        CancelarVentaUseCase(
+            ventaRepository = ventaRepository
+        )
+    }
+
     private val inicializarAppUseCase: InicializarAppUseCase by lazy {
         InicializarAppUseCase(
             negocioRepository = negocioRepository,
@@ -138,6 +161,15 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private val ventasDiaViewModel: VentasDiaViewModel by lazy {
+        VentasDiaViewModel(
+            negocioDao = database.negocioDao(),
+            obtenerVentasDelDiaUseCase = obtenerVentasDelDiaUseCase,
+            editarVentaUseCase = editarVentaUseCase,
+            cancelarVentaUseCase = cancelarVentaUseCase
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -148,7 +180,8 @@ class MainActivity : ComponentActivity() {
                 AppNavigation(
                     configuracionViewModel = configuracionViewModel,
                     productosViewModel = productosViewModel,
-                    ventaViewModel = ventaViewModel
+                    ventaViewModel = ventaViewModel,
+                    ventasDiaViewModel = ventasDiaViewModel
                 )
             }
         }

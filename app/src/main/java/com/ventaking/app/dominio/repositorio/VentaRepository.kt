@@ -10,6 +10,10 @@ interface VentaRepository {
 
     suspend fun registrarHistorialVenta(historialVenta: HistorialVenta)
 
+    suspend fun obtenerVentaPorId(ventaId: String): Venta?
+
+    suspend fun actualizarVenta(venta: Venta)
+
     fun observarVentasPorNegocioYFecha(
         negocioId: String,
         fechaVenta: String
