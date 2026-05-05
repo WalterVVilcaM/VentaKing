@@ -13,12 +13,14 @@ import com.ventaking.app.presentacion.pantallas.productos.ProductosScreen
 import com.ventaking.app.presentacion.pantallas.productos.ProductosViewModel
 import com.ventaking.app.presentacion.pantallas.sincronizacion.SincronizacionScreen
 import com.ventaking.app.presentacion.pantallas.venta.VentaScreen
+import com.ventaking.app.presentacion.pantallas.venta.VentaViewModel
 import com.ventaking.app.presentacion.pantallas.ventas_dia.VentasDiaScreen
 
 @Composable
 fun AppNavigation(
     configuracionViewModel: ConfiguracionViewModel,
-    productosViewModel: ProductosViewModel
+    productosViewModel: ProductosViewModel,
+    ventaViewModel: VentaViewModel
 ) {
     val navController = rememberNavController()
 
@@ -54,6 +56,7 @@ fun AppNavigation(
 
         composable(Rutas.Venta.ruta) {
             VentaScreen(
+                viewModel = ventaViewModel,
                 onVolver = {
                     navController.popBackStack()
                 }

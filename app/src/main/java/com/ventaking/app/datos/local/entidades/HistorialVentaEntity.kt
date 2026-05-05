@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
     tableName = "historial_ventas",
     indices = [
         Index(value = ["ventaId"]),
+        Index(value = ["grupoVentaId"]),
         Index(value = ["negocioId"]),
         Index(value = ["dispositivoId"]),
         Index(value = ["tipoAccion"]),
@@ -17,6 +18,7 @@ import androidx.room.PrimaryKey
 data class HistorialVentaEntity(
     @PrimaryKey val id: String,
     val ventaId: String,
+    val grupoVentaId: String,
     val negocioId: String,
     val dispositivoId: String,
     val tipoAccion: String,

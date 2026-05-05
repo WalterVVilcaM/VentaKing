@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "ventas",
     indices = [
+        Index(value = ["grupoVentaId"]),
         Index(value = ["negocioId"]),
         Index(value = ["productoId"]),
         Index(value = ["dispositivoId"]),
@@ -18,6 +19,7 @@ import androidx.room.PrimaryKey
 )
 data class VentaEntity(
     @PrimaryKey val id: String,
+    val grupoVentaId: String,
     val negocioId: String,
     val productoId: String?,
     val nombreProductoSnapshot: String,

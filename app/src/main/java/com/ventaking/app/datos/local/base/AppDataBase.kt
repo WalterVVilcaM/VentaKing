@@ -30,7 +30,7 @@ import com.ventaking.app.datos.local.entidades.VentaEntity
         RegistroArchivoSyncEntity::class,
         ConfiguracionAppEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -25,6 +25,13 @@ interface VentaDao {
 
     @Query("""
         SELECT * FROM ventas
+        WHERE grupoVentaId = :grupoVentaId
+        ORDER BY creadoEn ASC
+    """)
+    suspend fun obtenerPorGrupoVentaId(grupoVentaId: String): List<VentaEntity>
+
+    @Query("""
+        SELECT * FROM ventas
         WHERE negocioId = :negocioId
         AND fechaVenta = :fechaVenta
         ORDER BY creadoEn DESC

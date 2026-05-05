@@ -10,15 +10,20 @@ import com.ventaking.app.datos.repositorio.ConfiguracionAppRepositoryImpl
 import com.ventaking.app.datos.repositorio.DispositivoRepositoryImpl
 import com.ventaking.app.datos.repositorio.NegocioRepositoryImpl
 import com.ventaking.app.datos.repositorio.ProductoRapidoRepositoryImpl
+import com.ventaking.app.datos.repositorio.VentaRepositoryImpl
 import com.ventaking.app.dominio.casos.InicializarAppUseCase
 import com.ventaking.app.dominio.casos.productos.CrearProductoUseCase
 import com.ventaking.app.dominio.casos.productos.DesactivarProductoUseCase
 import com.ventaking.app.dominio.casos.productos.EditarProductoUseCase
 import com.ventaking.app.dominio.casos.productos.ObtenerProductosPorNegocioUseCase
 import com.ventaking.app.dominio.casos.productos.ReactivarProductoUseCase
+import com.ventaking.app.dominio.casos.ventas.CalcularTotalVentaUseCase
+import com.ventaking.app.dominio.casos.ventas.RegistrarHistorialVentaUseCase
+import com.ventaking.app.dominio.casos.ventas.RegistrarVentaUseCase
 import com.ventaking.app.presentacion.navegacion.AppNavigation
 import com.ventaking.app.presentacion.pantallas.configuracion.ConfiguracionViewModel
 import com.ventaking.app.presentacion.pantallas.productos.ProductosViewModel
+import com.ventaking.app.presentacion.pantallas.venta.VentaViewModel
 import com.ventaking.app.presentacion.tema.TemaVentaKing
 import kotlinx.coroutines.launch
 
@@ -29,7 +34,9 @@ class MainActivity : ComponentActivity() {
             applicationContext,
             AppDatabase::class.java,
             "ventaking_db"
-        ).build()
+        )
+            .fallbackToDestructiveMigration()
+            .build()
     }
 
     private val negocioRepository: NegocioRepositoryImpl by lazy {
@@ -56,6 +63,38 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private val ventaRepository: VentaRepositoryImpl by lazy {
+        VentaRepositoryImpl(
+            ventaDao = database.ventaDao(),
+            historialVentaDao = database.historialVentaDao()
+        )
+    }
+
+    private val obtenerProductosPorNegocioUseCase: ObtenerProductosPorNegocioUseCase by lazy {
+        ObtenerProductosPorNegocioUseCase(
+            productoRapidoRepository = productoRapidoRepository
+        )
+    }
+
+    private val calcularTotalVentaUseCase: CalcularTotalVentaUseCase by lazy {
+        CalcularTotalVentaUseCase()
+    }
+
+    private val registrarHistorialVentaUseCase: RegistrarHistorialVentaUseCase by lazy {
+        RegistrarHistorialVentaUseCase(
+            ventaRepository = ventaRepository
+        )
+    }
+
+    private val registrarVentaUseCase: RegistrarVentaUseCase by lazy {
+        RegistrarVentaUseCase(
+            ventaRepository = ventaRepository,
+            dispositivoRepository = dispositivoRepository,
+            calcularTotalVentaUseCase = calcularTotalVentaUseCase,
+            registrarHistorialVentaUseCase = registrarHistorialVentaUseCase
+        )
+    }
+
     private val inicializarAppUseCase: InicializarAppUseCase by lazy {
         InicializarAppUseCase(
             negocioRepository = negocioRepository,
@@ -74,9 +113,7 @@ class MainActivity : ComponentActivity() {
     private val productosViewModel: ProductosViewModel by lazy {
         ProductosViewModel(
             negocioDao = database.negocioDao(),
-            obtenerProductosPorNegocioUseCase = ObtenerProductosPorNegocioUseCase(
-                productoRapidoRepository = productoRapidoRepository
-            ),
+            obtenerProductosPorNegocioUseCase = obtenerProductosPorNegocioUseCase,
             crearProductoUseCase = CrearProductoUseCase(
                 productoRapidoRepository = productoRapidoRepository
             ),
@@ -92,6 +129,15 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private val ventaViewModel: VentaViewModel by lazy {
+        VentaViewModel(
+            negocioDao = database.negocioDao(),
+            obtenerProductosPorNegocioUseCase = obtenerProductosPorNegocioUseCase,
+            registrarVentaUseCase = registrarVentaUseCase,
+            ventaRepository = ventaRepository
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -101,7 +147,8 @@ class MainActivity : ComponentActivity() {
             TemaVentaKing {
                 AppNavigation(
                     configuracionViewModel = configuracionViewModel,
-                    productosViewModel = productosViewModel
+                    productosViewModel = productosViewModel,
+                    ventaViewModel = ventaViewModel
                 )
             }
         }
