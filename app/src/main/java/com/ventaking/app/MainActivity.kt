@@ -5,13 +5,22 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
 import androidx.room.Room
+import com.ventaking.app.datos.excel.GeneradorExcel
 import com.ventaking.app.datos.local.base.AppDatabase
 import com.ventaking.app.datos.repositorio.ConfiguracionAppRepositoryImpl
+import com.ventaking.app.datos.repositorio.CorteRepositoryImpl
 import com.ventaking.app.datos.repositorio.DispositivoRepositoryImpl
+import com.ventaking.app.datos.repositorio.ExportacionRepositoryImpl
 import com.ventaking.app.datos.repositorio.NegocioRepositoryImpl
 import com.ventaking.app.datos.repositorio.ProductoRapidoRepositoryImpl
 import com.ventaking.app.datos.repositorio.VentaRepositoryImpl
+import com.ventaking.app.datos.respaldo.GeneradorJson
 import com.ventaking.app.dominio.casos.InicializarAppUseCase
+import com.ventaking.app.dominio.casos.corte.CrearCorteDiarioUseCase
+import com.ventaking.app.dominio.casos.corte.ObtenerResumenCorteUseCase
+import com.ventaking.app.dominio.casos.exportacion.ExportarCorteExcelUseCase
+import com.ventaking.app.dominio.casos.exportacion.ExportarCorteJsonUseCase
+import com.ventaking.app.dominio.casos.exportacion.ExportarVentasJsonUseCase
 import com.ventaking.app.dominio.casos.productos.CrearProductoUseCase
 import com.ventaking.app.dominio.casos.productos.DesactivarProductoUseCase
 import com.ventaking.app.dominio.casos.productos.EditarProductoUseCase
@@ -25,15 +34,12 @@ import com.ventaking.app.dominio.casos.ventas.RegistrarHistorialVentaUseCase
 import com.ventaking.app.dominio.casos.ventas.RegistrarVentaUseCase
 import com.ventaking.app.presentacion.navegacion.AppNavigation
 import com.ventaking.app.presentacion.pantallas.configuracion.ConfiguracionViewModel
+import com.ventaking.app.presentacion.pantallas.corte.CorteViewModel
 import com.ventaking.app.presentacion.pantallas.productos.ProductosViewModel
 import com.ventaking.app.presentacion.pantallas.venta.VentaViewModel
 import com.ventaking.app.presentacion.pantallas.ventas_dia.VentasDiaViewModel
 import com.ventaking.app.presentacion.tema.TemaVentaKing
 import kotlinx.coroutines.launch
-import com.ventaking.app.datos.repositorio.CorteRepositoryImpl
-import com.ventaking.app.dominio.casos.corte.CrearCorteDiarioUseCase
-import com.ventaking.app.dominio.casos.corte.ObtenerResumenCorteUseCase
-import com.ventaking.app.presentacion.pantallas.corte.CorteViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -84,6 +90,27 @@ class MainActivity : ComponentActivity() {
             corteDiarioDao = database.corteDiarioDao(),
             ventaDao = database.ventaDao(),
             historialVentaDao = database.historialVentaDao()
+        )
+    }
+
+    private val generadorJson: GeneradorJson by lazy {
+        GeneradorJson()
+    }
+
+    private val generadorExcel: GeneradorExcel by lazy {
+        GeneradorExcel()
+    }
+
+    private val exportacionRepository: ExportacionRepositoryImpl by lazy {
+        ExportacionRepositoryImpl(
+            context = applicationContext,
+            corteDiarioDao = database.corteDiarioDao(),
+            ventaDao = database.ventaDao(),
+            negocioDao = database.negocioDao(),
+            dispositivoDao = database.dispositivoDao(),
+            registroArchivoSyncDao = database.registroArchivoSyncDao(),
+            generadorJson = generadorJson,
+            generadorExcel = generadorExcel
         )
     }
 
@@ -143,6 +170,24 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private val exportarVentasJsonUseCase: ExportarVentasJsonUseCase by lazy {
+        ExportarVentasJsonUseCase(
+            exportacionRepository = exportacionRepository
+        )
+    }
+
+    private val exportarCorteJsonUseCase: ExportarCorteJsonUseCase by lazy {
+        ExportarCorteJsonUseCase(
+            exportacionRepository = exportacionRepository
+        )
+    }
+
+    private val exportarCorteExcelUseCase: ExportarCorteExcelUseCase by lazy {
+        ExportarCorteExcelUseCase(
+            exportacionRepository = exportacionRepository
+        )
+    }
+
     private val inicializarAppUseCase: InicializarAppUseCase by lazy {
         InicializarAppUseCase(
             negocioRepository = negocioRepository,
@@ -188,7 +233,6 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-
     private val ventasDiaViewModel: VentasDiaViewModel by lazy {
         VentasDiaViewModel(
             negocioDao = database.negocioDao(),
@@ -203,7 +247,10 @@ class MainActivity : ComponentActivity() {
             negocioDao = database.negocioDao(),
             dispositivoRepository = dispositivoRepository,
             obtenerResumenCorteUseCase = obtenerResumenCorteUseCase,
-            crearCorteDiarioUseCase = crearCorteDiarioUseCase
+            crearCorteDiarioUseCase = crearCorteDiarioUseCase,
+            exportarVentasJsonUseCase = exportarVentasJsonUseCase,
+            exportarCorteJsonUseCase = exportarCorteJsonUseCase,
+            exportarCorteExcelUseCase = exportarCorteExcelUseCase
         )
     }
 
@@ -220,7 +267,6 @@ class MainActivity : ComponentActivity() {
                     ventaViewModel = ventaViewModel,
                     ventasDiaViewModel = ventasDiaViewModel,
                     corteViewModel = corteViewModel
-
                 )
             }
         }

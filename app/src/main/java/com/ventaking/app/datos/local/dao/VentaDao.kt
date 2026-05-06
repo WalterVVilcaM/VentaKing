@@ -32,6 +32,17 @@ interface VentaDao {
 
     @Query("""
         SELECT * FROM ventas
+        WHERE corteId = :corteId
+        AND estado = :estado
+        ORDER BY creadoEn ASC
+    """)
+    suspend fun obtenerPorCorteIdYEstado(
+        corteId: String,
+        estado: String
+    ): List<VentaEntity>
+
+    @Query("""
+        SELECT * FROM ventas
         WHERE negocioId = :negocioId
         AND fechaVenta = :fechaVenta
         ORDER BY creadoEn DESC

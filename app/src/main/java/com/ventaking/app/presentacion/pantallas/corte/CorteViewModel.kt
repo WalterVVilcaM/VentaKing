@@ -5,8 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.ventaking.app.datos.local.dao.NegocioDao
 import com.ventaking.app.dominio.casos.corte.CrearCorteDiarioUseCase
 import com.ventaking.app.dominio.casos.corte.ObtenerResumenCorteUseCase
+import com.ventaking.app.dominio.casos.exportacion.ExportarCorteExcelUseCase
+import com.ventaking.app.dominio.casos.exportacion.ExportarCorteJsonUseCase
+import com.ventaking.app.dominio.casos.exportacion.ExportarVentasJsonUseCase
 import com.ventaking.app.dominio.repositorio.DispositivoRepository
 import com.ventaking.app.dominio.repositorio.ResultadoCrearCorteDiario
+import com.ventaking.app.dominio.repositorio.ResultadoExportacion
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +27,10 @@ class CorteViewModel(
     private val negocioDao: NegocioDao,
     private val dispositivoRepository: DispositivoRepository,
     private val obtenerResumenCorteUseCase: ObtenerResumenCorteUseCase,
-    private val crearCorteDiarioUseCase: CrearCorteDiarioUseCase
+    private val crearCorteDiarioUseCase: CrearCorteDiarioUseCase,
+    private val exportarVentasJsonUseCase: ExportarVentasJsonUseCase,
+    private val exportarCorteJsonUseCase: ExportarCorteJsonUseCase,
+    private val exportarCorteExcelUseCase: ExportarCorteExcelUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -247,16 +254,33 @@ class CorteViewModel(
                 )
             ) {
                 is ResultadoCrearCorteDiario.Exito -> {
-                    _uiState.update {
-                        it.copy(
-                            creandoCorte = false,
-                            corteExistenteId = resultado.corte.id,
-                            mensajeExito = "Corte creado correctamente. Las ventas quedaron cerradas.",
-                            mensajeError = null
-                        )
-                    }
+                    val resultadoExportacion = exportarArchivosLocales(resultado.corte.id)
 
-                    limpiarMensajeExitoDespues()
+                    when (resultadoExportacion) {
+                        is ResultadoExportacionLocal.Exito -> {
+                            _uiState.update {
+                                it.copy(
+                                    creandoCorte = false,
+                                    corteExistenteId = resultado.corte.id,
+                                    mensajeExito = "Corte creado correctamente. Se generaron JSON y Excel locales.",
+                                    mensajeError = null
+                                )
+                            }
+
+                            limpiarMensajeExitoDespues()
+                        }
+
+                        is ResultadoExportacionLocal.Error -> {
+                            _uiState.update {
+                                it.copy(
+                                    creandoCorte = false,
+                                    corteExistenteId = resultado.corte.id,
+                                    mensajeExito = null,
+                                    mensajeError = "El corte fue creado, pero falló la exportación local: ${resultadoExportacion.mensaje}"
+                                )
+                            }
+                        }
+                    }
                 }
 
                 is ResultadoCrearCorteDiario.YaExiste -> {
@@ -293,6 +317,24 @@ class CorteViewModel(
         }
     }
 
+    private suspend fun exportarArchivosLocales(corteId: String): ResultadoExportacionLocal {
+        val resultados = listOf(
+            exportarVentasJsonUseCase(corteId),
+            exportarCorteJsonUseCase(corteId),
+            exportarCorteExcelUseCase(corteId)
+        )
+
+        val errores = resultados.filterIsInstance<ResultadoExportacion.Error>()
+
+        return if (errores.isEmpty()) {
+            ResultadoExportacionLocal.Exito
+        } else {
+            ResultadoExportacionLocal.Error(
+                mensaje = errores.joinToString(separator = " | ") { it.mensaje }
+            )
+        }
+    }
+
     private fun limpiarMensajeExitoDespues() {
         viewModelScope.launch {
             delay(2500)
@@ -316,5 +358,10 @@ class CorteViewModel(
     private fun obtenerFechaActual(): String {
         val formato = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         return formato.format(Date())
+    }
+
+    private sealed class ResultadoExportacionLocal {
+        data object Exito : ResultadoExportacionLocal()
+        data class Error(val mensaje: String) : ResultadoExportacionLocal()
     }
 }
