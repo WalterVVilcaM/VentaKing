@@ -30,6 +30,10 @@ import com.ventaking.app.presentacion.pantallas.venta.VentaViewModel
 import com.ventaking.app.presentacion.pantallas.ventas_dia.VentasDiaViewModel
 import com.ventaking.app.presentacion.tema.TemaVentaKing
 import kotlinx.coroutines.launch
+import com.ventaking.app.datos.repositorio.CorteRepositoryImpl
+import com.ventaking.app.dominio.casos.corte.CrearCorteDiarioUseCase
+import com.ventaking.app.dominio.casos.corte.ObtenerResumenCorteUseCase
+import com.ventaking.app.presentacion.pantallas.corte.CorteViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -69,6 +73,15 @@ class MainActivity : ComponentActivity() {
 
     private val ventaRepository: VentaRepositoryImpl by lazy {
         VentaRepositoryImpl(
+            ventaDao = database.ventaDao(),
+            historialVentaDao = database.historialVentaDao()
+        )
+    }
+
+    private val corteRepository: CorteRepositoryImpl by lazy {
+        CorteRepositoryImpl(
+            database = database,
+            corteDiarioDao = database.corteDiarioDao(),
             ventaDao = database.ventaDao(),
             historialVentaDao = database.historialVentaDao()
         )
@@ -118,6 +131,18 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private val obtenerResumenCorteUseCase: ObtenerResumenCorteUseCase by lazy {
+        ObtenerResumenCorteUseCase(
+            corteRepository = corteRepository
+        )
+    }
+
+    private val crearCorteDiarioUseCase: CrearCorteDiarioUseCase by lazy {
+        CrearCorteDiarioUseCase(
+            corteRepository = corteRepository
+        )
+    }
+
     private val inicializarAppUseCase: InicializarAppUseCase by lazy {
         InicializarAppUseCase(
             negocioRepository = negocioRepository,
@@ -155,11 +180,14 @@ class MainActivity : ComponentActivity() {
     private val ventaViewModel: VentaViewModel by lazy {
         VentaViewModel(
             negocioDao = database.negocioDao(),
+            corteDiarioDao = database.corteDiarioDao(),
+            dispositivoRepository = dispositivoRepository,
             obtenerProductosPorNegocioUseCase = obtenerProductosPorNegocioUseCase,
             registrarVentaUseCase = registrarVentaUseCase,
             ventaRepository = ventaRepository
         )
     }
+
 
     private val ventasDiaViewModel: VentasDiaViewModel by lazy {
         VentasDiaViewModel(
@@ -167,6 +195,15 @@ class MainActivity : ComponentActivity() {
             obtenerVentasDelDiaUseCase = obtenerVentasDelDiaUseCase,
             editarVentaUseCase = editarVentaUseCase,
             cancelarVentaUseCase = cancelarVentaUseCase
+        )
+    }
+
+    private val corteViewModel: CorteViewModel by lazy {
+        CorteViewModel(
+            negocioDao = database.negocioDao(),
+            dispositivoRepository = dispositivoRepository,
+            obtenerResumenCorteUseCase = obtenerResumenCorteUseCase,
+            crearCorteDiarioUseCase = crearCorteDiarioUseCase
         )
     }
 
@@ -181,7 +218,9 @@ class MainActivity : ComponentActivity() {
                     configuracionViewModel = configuracionViewModel,
                     productosViewModel = productosViewModel,
                     ventaViewModel = ventaViewModel,
-                    ventasDiaViewModel = ventasDiaViewModel
+                    ventasDiaViewModel = ventasDiaViewModel,
+                    corteViewModel = corteViewModel
+
                 )
             }
         }

@@ -2,11 +2,13 @@ package com.ventaking.app.presentacion.pantallas.venta
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ventaking.app.datos.local.dao.CorteDiarioDao
 import com.ventaking.app.datos.local.dao.NegocioDao
 import com.ventaking.app.dominio.casos.productos.ObtenerProductosPorNegocioUseCase
 import com.ventaking.app.dominio.casos.ventas.RegistrarVentaUseCase
 import com.ventaking.app.dominio.casos.ventas.ResultadoRegistrarVenta
 import com.ventaking.app.dominio.modelo.ProductoRapido
+import com.ventaking.app.dominio.repositorio.DispositivoRepository
 import com.ventaking.app.dominio.repositorio.VentaRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -24,6 +26,8 @@ import kotlin.math.roundToLong
 
 class VentaViewModel(
     private val negocioDao: NegocioDao,
+    private val corteDiarioDao: CorteDiarioDao,
+    private val dispositivoRepository: DispositivoRepository,
     private val obtenerProductosPorNegocioUseCase: ObtenerProductosPorNegocioUseCase,
     private val registrarVentaUseCase: RegistrarVentaUseCase,
     private val ventaRepository: VentaRepository
@@ -31,6 +35,9 @@ class VentaViewModel(
 
     private val _uiState = MutableStateFlow(VentaUiState())
     val uiState: StateFlow<VentaUiState> = _uiState.asStateFlow()
+
+    private val _corteState = MutableStateFlow(VentaCorteState())
+    val corteState: StateFlow<VentaCorteState> = _corteState.asStateFlow()
 
     private var productosJob: Job? = null
     private var totalDiaJob: Job? = null
@@ -73,6 +80,7 @@ class VentaViewModel(
                 if (negocioSeleccionado != null && negocioSeleccionado != negocioActual) {
                     observarProductos(negocioSeleccionado)
                     observarTotalDia(negocioSeleccionado)
+                    refrescarEstadoCorte(negocioSeleccionado)
                 }
             }
         }
@@ -97,8 +105,11 @@ class VentaViewModel(
             )
         }
 
+        _corteState.update { VentaCorteState(cargando = true) }
+
         observarProductos(id)
         observarTotalDia(id)
+        refrescarEstadoCorte(id)
     }
 
     private fun observarProductos(negocioId: String) {
@@ -138,7 +149,78 @@ class VentaViewModel(
         }
     }
 
+    fun refrescarEstadoCorte() {
+        val negocioId = _uiState.value.negocioSeleccionadoId ?: return
+        refrescarEstadoCorte(negocioId)
+    }
+
+    private fun refrescarEstadoCorte(negocioId: String) {
+        viewModelScope.launch {
+            _corteState.update { it.copy(cargando = true) }
+
+            dispositivoRepository.crearDispositivoSiNoExiste()
+            val dispositivoId = dispositivoRepository.obtenerIdDispositivoActual()
+
+            if (dispositivoId.isNullOrBlank()) {
+                _corteState.update {
+                    VentaCorteState(
+                        cargando = false,
+                        mensaje = "No se encontró el dispositivo local."
+                    )
+                }
+                return@launch
+            }
+
+            val corte = corteDiarioDao.obtenerPorNegocioFechaDispositivo(
+                negocioId = negocioId,
+                fechaCorte = obtenerFechaActual(),
+                dispositivoId = dispositivoId
+            )
+
+            if (corte != null) {
+                _uiState.update { estado ->
+                    estado.copy(
+                        carrito = emptyList(),
+                        extraTexto = "",
+                        descuentoTexto = "",
+                        subtotalCentavos = 0L,
+                        totalCentavos = 0L,
+                        guardando = false
+                    )
+                }
+            }
+
+            _corteState.update {
+                VentaCorteState(
+                    cargando = false,
+                    tieneCorteCerrado = corte != null,
+                    corteId = corte?.id,
+                    mensaje = if (corte != null) {
+                        "Este negocio ya tiene corte cerrado hoy. Las ventas nuevas se podrán registrar mañana."
+                    } else {
+                        null
+                    }
+                )
+            }
+        }
+    }
+
+    private fun ventaBloqueadaPorCorte(): Boolean {
+        if (!_corteState.value.tieneCorteCerrado) return false
+
+        _uiState.update { estado ->
+            estado.copy(
+                mensajeError = null,
+                mensajeExito = null
+            )
+        }
+
+        return true
+    }
+
     fun agregarAlCarrito(producto: ProductoRapido) {
+        if (ventaBloqueadaPorCorte()) return
+
         if (!producto.estaActivo) {
             _uiState.update { estado ->
                 estado.copy(
@@ -179,6 +261,8 @@ class VentaViewModel(
     }
 
     fun modificarCantidad(productoId: String, delta: Int) {
+        if (ventaBloqueadaPorCorte()) return
+
         _uiState.update { estado ->
             val carritoActualizado = estado.carrito.mapNotNull { item ->
                 if (item.producto.id == productoId) {
@@ -206,6 +290,8 @@ class VentaViewModel(
     }
 
     fun eliminarDelCarrito(productoId: String) {
+        if (ventaBloqueadaPorCorte()) return
+
         _uiState.update { estado ->
             estado.copy(
                 carrito = estado.carrito.filterNot { it.producto.id == productoId },
@@ -219,6 +305,8 @@ class VentaViewModel(
     }
 
     fun cambiarExtra(texto: String) {
+        if (ventaBloqueadaPorCorte()) return
+
         if (!esMontoValidoParaTexto(texto)) return
 
         _uiState.update { estado ->
@@ -234,6 +322,8 @@ class VentaViewModel(
     }
 
     fun cambiarDescuento(texto: String) {
+        if (ventaBloqueadaPorCorte()) return
+
         if (!esMontoValidoParaTexto(texto)) return
 
         _uiState.update { estado ->
@@ -273,6 +363,8 @@ class VentaViewModel(
     }
 
     fun registrarVenta() {
+        if (ventaBloqueadaPorCorte()) return
+
         val estado = _uiState.value
         val negocioId = estado.negocioSeleccionadoId
 
@@ -476,3 +568,10 @@ class VentaViewModel(
         return formato.format(centavos / 100.0)
     }
 }
+
+data class VentaCorteState(
+    val cargando: Boolean = false,
+    val tieneCorteCerrado: Boolean = false,
+    val corteId: String? = null,
+    val mensaje: String? = null
+)

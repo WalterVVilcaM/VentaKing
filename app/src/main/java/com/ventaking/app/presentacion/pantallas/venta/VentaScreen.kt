@@ -33,6 +33,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Star
@@ -59,6 +61,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,6 +89,11 @@ fun VentaScreen(
     onVolver: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val corteState by viewModel.corteState.collectAsState()
+
+    LaunchedEffect(uiState.negocioSeleccionadoId) {
+        viewModel.refrescarEstadoCorte()
+    }
 
     Scaffold(
         topBar = {
@@ -97,8 +105,20 @@ fun VentaScreen(
                     )
                 },
                 navigationIcon = {
-                    TextButton(onClick = onVolver) {
-                        Text("Volver")
+                    IconButton(
+                        onClick = onVolver,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowBack,
+                            contentDescription = "Volver",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 },
                 actions = {
@@ -126,6 +146,7 @@ fun VentaScreen(
             BarraCobroFija(
                 total = viewModel.formatearCentavos(uiState.totalCentavos),
                 habilitado = uiState.carrito.isNotEmpty() &&
+                        !corteState.tieneCorteCerrado &&
                         !uiState.guardando &&
                         uiState.totalCentavos > 0L &&
                         uiState.mensajeError == null,
@@ -150,6 +171,13 @@ fun VentaScreen(
                     uiState = uiState,
                     onSeleccionarNegocio = viewModel::seleccionarNegocio
                 )
+
+                if (corteState.tieneCorteCerrado) {
+                    AvisoVentaBloqueadaPorCorte(
+                        mensaje = corteState.mensaje
+                            ?: "Este negocio ya tiene corte cerrado hoy. Las ventas nuevas se podrán registrar mañana."
+                    )
+                }
 
                 // ── Mensajes de error o éxito ────────────────────────────
                 uiState.mensajeError?.let { MensajeVenta(texto = it, esError = true) }
@@ -333,6 +361,59 @@ private fun SelectorNegocioVenta(
                     borderColor = MaterialTheme.colorScheme.outlineVariant
                 )
             )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AVISO DE CORTE CERRADO
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun AvisoVentaBloqueadaPorCorte(
+    mensaje: String
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(32.dp),
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.12f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+            }
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = "Corte ya realizado",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = mensaje,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
     }
 }

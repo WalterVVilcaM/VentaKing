@@ -71,6 +71,22 @@ interface VentaDao {
     ): List<VentaEntity>
 
     @Query("""
+        SELECT * FROM ventas
+        WHERE negocioId = :negocioId
+        AND fechaVenta = :fechaVenta
+        AND dispositivoId = :dispositivoId
+        AND estado = :estado
+        AND corteId IS NULL
+        ORDER BY creadoEn ASC
+    """)
+    fun observarVentasAbiertasParaCorte(
+        negocioId: String,
+        fechaVenta: String,
+        dispositivoId: String,
+        estado: String
+    ): Flow<List<VentaEntity>>
+
+    @Query("""
         SELECT COALESCE(SUM(totalCentavos), 0) FROM ventas
         WHERE negocioId = :negocioId
         AND fechaVenta = :fechaVenta
