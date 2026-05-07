@@ -1,0 +1,237 @@
+package com.ventaking.app.datos.repositorio
+
+import com.ventaking.app.datos.drive.DriveServiceProvider
+import com.ventaking.app.datos.drive.ResultadoDrive
+import com.ventaking.app.datos.local.dao.CorteDiarioDao
+import com.ventaking.app.datos.local.dao.DispositivoDao
+import com.ventaking.app.datos.local.dao.RegistroArchivoSyncDao
+import com.ventaking.app.datos.local.entidades.RegistroArchivoSyncEntity
+import com.ventaking.app.dominio.repositorio.ResultadoSubidaCorte
+import com.ventaking.app.dominio.repositorio.SincronizacionRepository
+import com.ventaking.app.nucleo.constantes.GoogleDriveConfig
+import com.ventaking.app.nucleo.constantes.SyncEstado
+import java.io.File
+
+class SincronizacionRepositoryImpl(
+    private val registroArchivoSyncDao: RegistroArchivoSyncDao,
+    private val corteDiarioDao: CorteDiarioDao,
+    private val dispositivoDao: DispositivoDao,
+    private val driveServiceProvider: DriveServiceProvider
+) : SincronizacionRepository {
+
+    override suspend fun subirArchivosCorte(corteId: String): ResultadoSubidaCorte {
+        val ahora = System.currentTimeMillis()
+
+        val driveDataSource = driveServiceProvider.obtenerDataSource()
+
+        if (driveDataSource == null) {
+            val mensaje = "Google Drive no está conectado. El corte queda pendiente de respaldo."
+
+            corteDiarioDao.actualizarSyncEstado(
+                corteId = corteId,
+                syncEstado = SyncEstado.PENDING_SYNC,
+                sincronizadoEn = null,
+                mensajeError = mensaje
+            )
+
+            return ResultadoSubidaCorte.Error(mensaje)
+        }
+
+        val registros = registroArchivoSyncDao.obtenerPorCorte(corteId)
+
+        if (registros.isEmpty()) {
+            val mensaje = "No hay archivos locales registrados para respaldar este corte."
+
+            corteDiarioDao.actualizarSyncEstado(
+                corteId = corteId,
+                syncEstado = SyncEstado.SYNC_ERROR,
+                sincronizadoEn = null,
+                mensajeError = mensaje
+            )
+
+            return ResultadoSubidaCorte.Error(mensaje)
+        }
+
+        if (registros.size < TOTAL_ARCHIVOS_OBLIGATORIOS) {
+            val mensaje = "El corte no tiene los tres archivos obligatorios para subir a Drive."
+
+            corteDiarioDao.actualizarSyncEstado(
+                corteId = corteId,
+                syncEstado = SyncEstado.SYNC_ERROR,
+                sincronizadoEn = null,
+                mensajeError = mensaje
+            )
+
+            return ResultadoSubidaCorte.Error(mensaje)
+        }
+
+        val carpetaRaizId = when (
+            val resultado = driveDataSource.obtenerOCrearCarpeta(
+                nombreCarpeta = GoogleDriveConfig.CARPETA_RAIZ_DRIVE
+            )
+        ) {
+            is ResultadoDrive.Exito -> resultado.driveFileId
+            is ResultadoDrive.Error -> {
+                marcarCorteConError(corteId, resultado.mensaje)
+                return ResultadoSubidaCorte.Error(resultado.mensaje)
+            }
+        }
+
+        val carpetaNegocioNombre = obtenerCarpetaNegocio(registros.first())
+
+        val carpetaNegocioId = when (
+            val resultado = driveDataSource.obtenerOCrearCarpeta(
+                nombreCarpeta = carpetaNegocioNombre,
+                parentId = carpetaRaizId
+            )
+        ) {
+            is ResultadoDrive.Exito -> resultado.driveFileId
+            is ResultadoDrive.Error -> {
+                marcarCorteConError(corteId, resultado.mensaje)
+                return ResultadoSubidaCorte.Error(resultado.mensaje)
+            }
+        }
+
+        val fechaCorte = registros.first().fechaCorte
+
+        val carpetaFechaId = when (
+            val resultado = driveDataSource.obtenerOCrearCarpeta(
+                nombreCarpeta = fechaCorte,
+                parentId = carpetaNegocioId
+            )
+        ) {
+            is ResultadoDrive.Exito -> resultado.driveFileId
+            is ResultadoDrive.Error -> {
+                marcarCorteConError(corteId, resultado.mensaje)
+                return ResultadoSubidaCorte.Error(resultado.mensaje)
+            }
+        }
+
+        var archivosSubidos = 0
+        var archivosOmitidos = 0
+        val errores = mutableListOf<String>()
+
+        registros.forEach { registro ->
+            if (registro.syncEstado == SyncEstado.SYNCED && registro.driveFileId != null) {
+                archivosOmitidos++
+                return@forEach
+            }
+
+            val archivoLocal = File(registro.rutaLocal)
+
+            if (!archivoLocal.exists()) {
+                val mensaje = "Archivo local no encontrado: ${registro.nombreArchivo}"
+                errores.add(mensaje)
+
+                registroArchivoSyncDao.actualizarResultadoSync(
+                    id = registro.id,
+                    driveFileId = registro.driveFileId,
+                    syncEstado = SyncEstado.SYNC_ERROR,
+                    sincronizadoEn = null,
+                    actualizadoEn = ahora,
+                    mensajeError = mensaje
+                )
+
+                return@forEach
+            }
+
+            when (
+                val resultado = driveDataSource.subirArchivoSiNoExiste(
+                    carpetaDriveId = carpetaFechaId,
+                    nombreArchivo = registro.nombreArchivo,
+                    rutaLocal = registro.rutaLocal,
+                    hashArchivo = registro.hashArchivo,
+                    corteId = registro.corteId,
+                    tipoArchivo = registro.tipoArchivo
+                )
+            ) {
+                is ResultadoDrive.Exito -> {
+                    registroArchivoSyncDao.actualizarResultadoSync(
+                        id = registro.id,
+                        driveFileId = resultado.driveFileId,
+                        syncEstado = SyncEstado.SYNCED,
+                        sincronizadoEn = ahora,
+                        actualizadoEn = ahora,
+                        mensajeError = null
+                    )
+
+                    archivosSubidos++
+                }
+
+                is ResultadoDrive.Error -> {
+                    errores.add(resultado.mensaje)
+
+                    registroArchivoSyncDao.actualizarResultadoSync(
+                        id = registro.id,
+                        driveFileId = registro.driveFileId,
+                        syncEstado = SyncEstado.SYNC_ERROR,
+                        sincronizadoEn = null,
+                        actualizadoEn = ahora,
+                        mensajeError = resultado.mensaje
+                    )
+                }
+            }
+        }
+
+        return if (errores.isEmpty()) {
+            corteDiarioDao.actualizarSyncEstado(
+                corteId = corteId,
+                syncEstado = SyncEstado.SYNCED,
+                sincronizadoEn = ahora,
+                mensajeError = null
+            )
+
+            dispositivoDao.obtenerActual()?.let { dispositivo ->
+                dispositivoDao.actualizarUltimoRespaldo(
+                    id = dispositivo.id,
+                    ultimoRespaldoEn = ahora,
+                    actualizadoEn = ahora
+                )
+            }
+
+            ResultadoSubidaCorte.Exito(
+                archivosSubidos = archivosSubidos,
+                archivosOmitidos = archivosOmitidos
+            )
+        } else {
+            val mensajeFinal = errores.joinToString(separator = " | ")
+
+            corteDiarioDao.actualizarSyncEstado(
+                corteId = corteId,
+                syncEstado = SyncEstado.SYNC_ERROR,
+                sincronizadoEn = null,
+                mensajeError = mensajeFinal
+            )
+
+            ResultadoSubidaCorte.Error(mensajeFinal)
+        }
+    }
+
+    private suspend fun marcarCorteConError(
+        corteId: String,
+        mensaje: String
+    ) {
+        corteDiarioDao.actualizarSyncEstado(
+            corteId = corteId,
+            syncEstado = SyncEstado.SYNC_ERROR,
+            sincronizadoEn = null,
+            mensajeError = mensaje
+        )
+    }
+
+    private fun obtenerCarpetaNegocio(
+        registro: RegistroArchivoSyncEntity
+    ): String {
+        val archivo = File(registro.rutaLocal)
+
+        return archivo.parentFile
+            ?.parentFile
+            ?.name
+            ?.takeIf { it.isNotBlank() }
+            ?: registro.negocioId
+    }
+
+    private companion object {
+        const val TOTAL_ARCHIVOS_OBLIGATORIOS = 3
+    }
+}

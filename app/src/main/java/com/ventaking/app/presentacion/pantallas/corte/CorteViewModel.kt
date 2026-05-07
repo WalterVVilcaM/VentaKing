@@ -11,6 +11,8 @@ import com.ventaking.app.dominio.casos.exportacion.ExportarVentasJsonUseCase
 import com.ventaking.app.dominio.repositorio.DispositivoRepository
 import com.ventaking.app.dominio.repositorio.ResultadoCrearCorteDiario
 import com.ventaking.app.dominio.repositorio.ResultadoExportacion
+import com.ventaking.app.dominio.casos.sincronizacion.SubirArchivosCorteUseCase
+import com.ventaking.app.dominio.repositorio.ResultadoSubidaCorte
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +32,10 @@ class CorteViewModel(
     private val crearCorteDiarioUseCase: CrearCorteDiarioUseCase,
     private val exportarVentasJsonUseCase: ExportarVentasJsonUseCase,
     private val exportarCorteJsonUseCase: ExportarCorteJsonUseCase,
-    private val exportarCorteExcelUseCase: ExportarCorteExcelUseCase
+    private val exportarCorteExcelUseCase: ExportarCorteExcelUseCase,
+    private val subirArchivosCorteUseCase: SubirArchivosCorteUseCase,
+    private val driveConectado: () -> Boolean,
+    private val solicitarConexionDrive: () -> Unit
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -258,16 +263,44 @@ class CorteViewModel(
 
                     when (resultadoExportacion) {
                         is ResultadoExportacionLocal.Exito -> {
-                            _uiState.update {
-                                it.copy(
-                                    creandoCorte = false,
-                                    corteExistenteId = resultado.corte.id,
-                                    mensajeExito = "Corte creado correctamente. Se generaron JSON y Excel locales.",
-                                    mensajeError = null
-                                )
-                            }
+                            if (driveConectado()) {
+                                when (val resultadoDrive = subirArchivosCorteUseCase(resultado.corte.id)) {
+                                    is ResultadoSubidaCorte.Exito -> {
+                                        _uiState.update {
+                                            it.copy(
+                                                creandoCorte = false,
+                                                corteExistenteId = resultado.corte.id,
+                                                mensajeExito = "Corte creado correctamente. JSON, Excel y respaldo en Drive listos.",
+                                                mensajeError = null
+                                            )
+                                        }
 
-                            limpiarMensajeExitoDespues()
+                                        limpiarMensajeExitoDespues()
+                                    }
+
+                                    is ResultadoSubidaCorte.Error -> {
+                                        _uiState.update {
+                                            it.copy(
+                                                creandoCorte = false,
+                                                corteExistenteId = resultado.corte.id,
+                                                mensajeExito = "Corte creado y archivos locales generados. Respaldo Drive pendiente.",
+                                                mensajeError = resultadoDrive.mensaje
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                _uiState.update {
+                                    it.copy(
+                                        creandoCorte = false,
+                                        corteExistenteId = resultado.corte.id,
+                                        mensajeExito = "Corte creado y archivos locales generados. Autoriza Google Drive para respaldarlo.",
+                                        mensajeError = null
+                                    )
+                                }
+
+                                solicitarConexionDrive()
+                            }
                         }
 
                         is ResultadoExportacionLocal.Error -> {
@@ -310,6 +343,43 @@ class CorteViewModel(
                             creandoCorte = false,
                             mensajeError = resultado.mensaje,
                             mensajeExito = null
+                        )
+                    }
+                }
+            }
+        }
+    }
+    fun respaldarCorteActualEnDrive() {
+        val corteId = _uiState.value.corteExistenteId ?: return
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    creandoCorte = true,
+                    mensajeError = null,
+                    mensajeExito = null
+                )
+            }
+
+            when (val resultadoDrive = subirArchivosCorteUseCase(corteId)) {
+                is ResultadoSubidaCorte.Exito -> {
+                    _uiState.update {
+                        it.copy(
+                            creandoCorte = false,
+                            mensajeExito = "Respaldo en Google Drive completado.",
+                            mensajeError = null
+                        )
+                    }
+
+                    limpiarMensajeExitoDespues()
+                }
+
+                is ResultadoSubidaCorte.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            creandoCorte = false,
+                            mensajeExito = null,
+                            mensajeError = resultadoDrive.mensaje
                         )
                     }
                 }

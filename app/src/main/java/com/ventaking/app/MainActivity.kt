@@ -40,8 +40,46 @@ import com.ventaking.app.presentacion.pantallas.venta.VentaViewModel
 import com.ventaking.app.presentacion.pantallas.ventas_dia.VentasDiaViewModel
 import com.ventaking.app.presentacion.tema.TemaVentaKing
 import kotlinx.coroutines.launch
+import android.content.Intent
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.Scope
+import com.google.api.client.http.javanet.NetHttpTransport
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
+import com.google.api.client.json.gson.GsonFactory
+import com.google.api.services.drive.Drive
+import com.google.api.services.drive.DriveScopes
+import com.ventaking.app.datos.drive.DriveServiceProvider
+import com.ventaking.app.datos.repositorio.SincronizacionRepositoryImpl
+import com.ventaking.app.dominio.casos.sincronizacion.SubirArchivosCorteUseCase
+import com.ventaking.app.nucleo.constantes.GoogleDriveConfig
+import java.util.Collections
 
 class MainActivity : ComponentActivity() {
+
+    private lateinit var googleSignInClient: GoogleSignInClient
+
+    private val driveServiceProvider: DriveServiceProvider by lazy {
+        DriveServiceProvider()
+    }
+
+    private val driveSignInLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { resultado ->
+            val tarea = GoogleSignIn.getSignedInAccountFromIntent(resultado.data)
+
+            try {
+                val cuenta = tarea.getResult(ApiException::class.java)
+                configurarDriveConCuenta(cuenta)
+                corteViewModel.respaldarCorteActualEnDrive()
+            } catch (e: ApiException) {
+                driveServiceProvider.cerrarConexion()
+            }
+        }
 
     private val database: AppDatabase by lazy {
         Room.databaseBuilder(
@@ -188,6 +226,21 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private val sincronizacionRepository: SincronizacionRepositoryImpl by lazy {
+        SincronizacionRepositoryImpl(
+            registroArchivoSyncDao = database.registroArchivoSyncDao(),
+            corteDiarioDao = database.corteDiarioDao(),
+            dispositivoDao = database.dispositivoDao(),
+            driveServiceProvider = driveServiceProvider
+        )
+    }
+
+    private val subirArchivosCorteUseCase: SubirArchivosCorteUseCase by lazy {
+        SubirArchivosCorteUseCase(
+            sincronizacionRepository = sincronizacionRepository
+        )
+    }
+
     private val inicializarAppUseCase: InicializarAppUseCase by lazy {
         InicializarAppUseCase(
             negocioRepository = negocioRepository,
@@ -250,13 +303,22 @@ class MainActivity : ComponentActivity() {
             crearCorteDiarioUseCase = crearCorteDiarioUseCase,
             exportarVentasJsonUseCase = exportarVentasJsonUseCase,
             exportarCorteJsonUseCase = exportarCorteJsonUseCase,
-            exportarCorteExcelUseCase = exportarCorteExcelUseCase
+            exportarCorteExcelUseCase = exportarCorteExcelUseCase,
+            subirArchivosCorteUseCase = subirArchivosCorteUseCase,
+            driveConectado = {
+                driveServiceProvider.estaConectado()
+            },
+            solicitarConexionDrive = {
+                solicitarConexionDrive()
+            }
         )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        configurarGoogleDrive()
+        configurarDriveSiYaAutorizado()
         inicializarDatosLocales()
 
         setContent {
@@ -270,6 +332,46 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    private fun configurarGoogleDrive() {
+        val opciones = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .requestScopes(Scope(DriveScopes.DRIVE_FILE))
+            .build()
+
+        googleSignInClient = GoogleSignIn.getClient(this, opciones)
+    }
+
+    private fun configurarDriveSiYaAutorizado() {
+        val cuenta = GoogleSignIn.getLastSignedInAccount(this)
+
+        if (cuenta != null && GoogleSignIn.hasPermissions(cuenta, Scope(DriveScopes.DRIVE_FILE))) {
+            configurarDriveConCuenta(cuenta)
+        }
+    }
+
+    private fun solicitarConexionDrive() {
+        driveSignInLauncher.launch(googleSignInClient.signInIntent)
+    }
+
+    private fun configurarDriveConCuenta(cuenta: GoogleSignInAccount) {
+        val credencial = GoogleAccountCredential.usingOAuth2(
+            applicationContext,
+            Collections.singleton(DriveScopes.DRIVE_FILE)
+        )
+
+        credencial.selectedAccount = cuenta.account
+
+        val driveService = Drive.Builder(
+            NetHttpTransport(),
+            GsonFactory.getDefaultInstance(),
+            credencial
+        )
+            .setApplicationName(GoogleDriveConfig.APP_NAME)
+            .build()
+
+        driveServiceProvider.configurar(driveService)
     }
 
     private fun inicializarDatosLocales() {

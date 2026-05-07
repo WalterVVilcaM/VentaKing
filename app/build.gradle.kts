@@ -1,3 +1,5 @@
+import org.gradle.internal.impldep.org.junit.experimental.categories.Categories.CategoryFilter.exclude
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -72,6 +74,19 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation("androidx.compose.material:material-icons-extended")
+    implementation(libs.google.play.services.auth)
+
+    implementation(libs.google.api.client.android) {
+        exclude(group = "org.apache.httpcomponents")
+    }
+
+    implementation(libs.google.http.client.gson) {
+        exclude(group = "org.apache.httpcomponents")
+    }
+
+    implementation(libs.google.api.services.drive) {
+        exclude(group = "org.apache.httpcomponents")
+    }
     ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)
