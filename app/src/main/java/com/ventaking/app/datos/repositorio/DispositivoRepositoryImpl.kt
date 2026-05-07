@@ -3,7 +3,10 @@ package com.ventaking.app.datos.repositorio
 import android.os.Build
 import com.ventaking.app.datos.local.dao.DispositivoDao
 import com.ventaking.app.datos.local.entidades.DispositivoEntity
+import com.ventaking.app.dominio.modelo.Dispositivo
 import com.ventaking.app.dominio.repositorio.DispositivoRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import java.util.UUID
 
 class DispositivoRepositoryImpl(
@@ -49,6 +52,22 @@ class DispositivoRepositoryImpl(
             id = dispositivoActual.id,
             nombreDispositivo = nombreDispositivo?.trim(),
             actualizadoEn = System.currentTimeMillis()
+        )
+    }
+
+    override fun observarDispositivoActual(): Flow<Dispositivo?> {
+        return dispositivoDao.observarActual().map { dispositivo ->
+            dispositivo?.toDomain()
+        }
+    }
+
+    private fun DispositivoEntity.toDomain(): Dispositivo {
+        return Dispositivo(
+            id = id,
+            nombreDispositivo = nombreDispositivo,
+            creadoEn = creadoEn,
+            actualizadoEn = actualizadoEn,
+            ultimoRespaldoEn = ultimoRespaldoEn
         )
     }
 }

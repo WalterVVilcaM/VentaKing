@@ -29,6 +29,9 @@ interface NegocioDao {
     @Query("SELECT * FROM negocios WHERE id = :id LIMIT 1")
     suspend fun obtenerPorId(id: String): NegocioEntity?
 
+    @Query("SELECT * FROM negocios WHERE LOWER(nombre) = LOWER(:nombre) LIMIT 1")
+    suspend fun obtenerPorNombre(nombre: String): NegocioEntity?
+
     @Query("SELECT COUNT(*) FROM negocios")
     suspend fun contar(): Int
 }

@@ -25,10 +25,43 @@ interface HistorialVentaDao {
 
     @Query("""
         SELECT * FROM historial_ventas
+        WHERE grupoVentaId = :grupoVentaId
+        ORDER BY creadoEn ASC
+    """)
+    fun observarPorGrupoVenta(grupoVentaId: String): Flow<List<HistorialVentaEntity>>
+
+    @Query("""
+        SELECT * FROM historial_ventas
         WHERE negocioId = :negocioId
         ORDER BY creadoEn DESC
     """)
     fun observarPorNegocio(negocioId: String): Flow<List<HistorialVentaEntity>>
+
+    @Query("""
+        SELECT * FROM historial_ventas
+        WHERE negocioId = :negocioId
+        AND creadoEn BETWEEN :desde AND :hasta
+        ORDER BY creadoEn DESC
+    """)
+    fun observarPorNegocioYRango(
+        negocioId: String,
+        desde: Long,
+        hasta: Long
+    ): Flow<List<HistorialVentaEntity>>
+
+    @Query("""
+        SELECT * FROM historial_ventas
+        WHERE negocioId = :negocioId
+        AND dispositivoId = :dispositivoId
+        AND creadoEn BETWEEN :desde AND :hasta
+        ORDER BY creadoEn DESC
+    """)
+    fun observarPorNegocioDispositivoYRango(
+        negocioId: String,
+        dispositivoId: String,
+        desde: Long,
+        hasta: Long
+    ): Flow<List<HistorialVentaEntity>>
 
     @Query("""
         SELECT * FROM historial_ventas

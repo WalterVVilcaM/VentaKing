@@ -33,6 +33,13 @@ interface VentaDao {
     @Query("""
         SELECT * FROM ventas
         WHERE corteId = :corteId
+        ORDER BY creadoEn ASC
+    """)
+    suspend fun obtenerPorCorteId(corteId: String): List<VentaEntity>
+
+    @Query("""
+        SELECT * FROM ventas
+        WHERE corteId = :corteId
         AND estado = :estado
         ORDER BY creadoEn ASC
     """)
@@ -62,6 +69,34 @@ interface VentaDao {
     fun observarPorNegocioFechaYEstado(
         negocioId: String,
         fechaVenta: String,
+        estado: String
+    ): Flow<List<VentaEntity>>
+
+    @Query("""
+        SELECT * FROM ventas
+        WHERE negocioId = :negocioId
+        AND fechaVenta = :fechaVenta
+        AND dispositivoId = :dispositivoId
+        ORDER BY creadoEn DESC
+    """)
+    fun observarPorNegocioFechaYDispositivo(
+        negocioId: String,
+        fechaVenta: String,
+        dispositivoId: String
+    ): Flow<List<VentaEntity>>
+
+    @Query("""
+        SELECT * FROM ventas
+        WHERE negocioId = :negocioId
+        AND fechaVenta = :fechaVenta
+        AND dispositivoId = :dispositivoId
+        AND estado = :estado
+        ORDER BY creadoEn DESC
+    """)
+    fun observarPorNegocioFechaDispositivoYEstado(
+        negocioId: String,
+        fechaVenta: String,
+        dispositivoId: String,
         estado: String
     ): Flow<List<VentaEntity>>
 

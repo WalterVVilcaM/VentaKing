@@ -42,6 +42,30 @@ interface CorteDiarioDao {
 
     @Query("""
         SELECT * FROM cortes_diarios
+        WHERE fechaCorte = :fechaCorte
+        AND negocioId = :negocioId
+        ORDER BY creadoEn DESC
+    """)
+    fun observarPorFechaYNegocio(
+        fechaCorte: String,
+        negocioId: String
+    ): Flow<List<CorteDiarioEntity>>
+
+    @Query("""
+        SELECT * FROM cortes_diarios
+        WHERE fechaCorte = :fechaCorte
+        AND negocioId = :negocioId
+        AND dispositivoId = :dispositivoId
+        ORDER BY creadoEn DESC
+    """)
+    fun observarPorFechaNegocioYDispositivo(
+        fechaCorte: String,
+        negocioId: String,
+        dispositivoId: String
+    ): Flow<List<CorteDiarioEntity>>
+
+    @Query("""
+        SELECT * FROM cortes_diarios
         WHERE syncEstado IN (:estados)
         ORDER BY creadoEn ASC
     """)

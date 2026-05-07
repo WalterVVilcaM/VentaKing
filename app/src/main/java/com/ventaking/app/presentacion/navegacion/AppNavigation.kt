@@ -18,6 +18,7 @@ import com.ventaking.app.presentacion.pantallas.venta.VentaScreen
 import com.ventaking.app.presentacion.pantallas.venta.VentaViewModel
 import com.ventaking.app.presentacion.pantallas.ventas_dia.VentasDiaScreen
 import com.ventaking.app.presentacion.pantallas.ventas_dia.VentasDiaViewModel
+import com.ventaking.app.presentacion.pantallas.historial.HistorialViewModel
 
 @Composable
 fun AppNavigation(
@@ -26,7 +27,11 @@ fun AppNavigation(
     ventaViewModel: VentaViewModel,
     ventasDiaViewModel: VentasDiaViewModel,
     corteViewModel: CorteViewModel,
-    sincronizacionViewModel: SincronizacionViewModel
+    sincronizacionViewModel: SincronizacionViewModel,
+    historialViewModel: HistorialViewModel,
+    onImportarJsonHistorial: () -> Unit,
+    onExportarCorteHistorial: (String?) -> Unit
+
 ) {
     val navController = rememberNavController()
 
@@ -98,9 +103,12 @@ fun AppNavigation(
 
         composable(Rutas.Historial.ruta) {
             HistorialScreen(
+                viewModel = historialViewModel,
                 onVolver = {
                     navController.popBackStack()
-                }
+                },
+                onImportarJson = onImportarJsonHistorial,
+                onExportarCorte = onExportarCorteHistorial
             )
         }
 

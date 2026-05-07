@@ -2,7 +2,10 @@ package com.ventaking.app.datos.repositorio
 
 import com.ventaking.app.datos.local.dao.NegocioDao
 import com.ventaking.app.datos.local.entidades.NegocioEntity
+import com.ventaking.app.dominio.modelo.Negocio
 import com.ventaking.app.dominio.repositorio.NegocioRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import java.util.UUID
 
 class NegocioRepositoryImpl(
@@ -38,5 +41,21 @@ class NegocioRepositoryImpl(
         )
 
         negocioDao.insertarTodos(negociosBase)
+    }
+
+    override fun observarNegociosActivos(): Flow<List<Negocio>> {
+        return negocioDao.observarActivos().map { negocios ->
+            negocios.map { it.toDomain() }
+        }
+    }
+
+    private fun NegocioEntity.toDomain(): Negocio {
+        return Negocio(
+            id = id,
+            nombre = nombre,
+            estaActivo = estaActivo,
+            creadoEn = creadoEn,
+            actualizadoEn = actualizadoEn
+        )
     }
 }
