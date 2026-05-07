@@ -13,7 +13,9 @@ data class CorteUiState(
     val corteExistenteId: String? = null,
     val mensajeError: String? = null,
     val mensajeExito: String? = null,
-    val mostrarConfirmacionCorte: Boolean = false
+    val mostrarConfirmacionCorte: Boolean = false,
+    val mostrarModalSinInternet: Boolean = false,
+    val mensajeModalSinInternet: String? = null
 ) {
     val puedeCrearCorte: Boolean
         get() = !cargando &&

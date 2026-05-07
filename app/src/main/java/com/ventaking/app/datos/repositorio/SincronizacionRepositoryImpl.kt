@@ -11,6 +11,9 @@ import com.ventaking.app.dominio.repositorio.SincronizacionRepository
 import com.ventaking.app.nucleo.constantes.GoogleDriveConfig
 import com.ventaking.app.nucleo.constantes.SyncEstado
 import java.io.File
+import com.ventaking.app.dominio.repositorio.CortePendienteSync
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 class SincronizacionRepositoryImpl(
     private val registroArchivoSyncDao: RegistroArchivoSyncDao,
@@ -204,6 +207,52 @@ class SincronizacionRepositoryImpl(
             )
 
             ResultadoSubidaCorte.Error(mensajeFinal)
+        }
+    }
+
+    override fun observarCortesPendientes(): Flow<List<CortePendienteSync>> {
+        return corteDiarioDao.observarPorEstadosSync(
+            estados = listOf(
+                SyncEstado.PENDING_SYNC,
+                SyncEstado.SYNC_ERROR
+            )
+        ).map { cortes ->
+            cortes.map { corte ->
+                CortePendienteSync(
+                    id = corte.id,
+                    negocioId = corte.negocioId,
+                    fechaCorte = corte.fechaCorte,
+                    dispositivoId = corte.dispositivoId,
+                    totalCentavos = corte.totalCentavos,
+                    totalVentas = corte.totalVentas,
+                    totalPiezas = corte.totalPiezas,
+                    creadoEn = corte.creadoEn,
+                    syncEstado = corte.syncEstado,
+                    mensajeError = corte.mensajeError
+                )
+            }
+        }
+    }
+
+    override suspend fun obtenerCortesPendientes(): List<CortePendienteSync> {
+        return corteDiarioDao.obtenerListaPorEstadosSync(
+            estados = listOf(
+                SyncEstado.PENDING_SYNC,
+                SyncEstado.SYNC_ERROR
+            )
+        ).map { corte ->
+            CortePendienteSync(
+                id = corte.id,
+                negocioId = corte.negocioId,
+                fechaCorte = corte.fechaCorte,
+                dispositivoId = corte.dispositivoId,
+                totalCentavos = corte.totalCentavos,
+                totalVentas = corte.totalVentas,
+                totalPiezas = corte.totalPiezas,
+                creadoEn = corte.creadoEn,
+                syncEstado = corte.syncEstado,
+                mensajeError = corte.mensajeError
+            )
         }
     }
 

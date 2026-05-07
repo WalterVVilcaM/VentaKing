@@ -60,4 +60,11 @@ interface CorteDiarioDao {
         sincronizadoEn: Long?,
         mensajeError: String?
     )
+
+    @Query("""
+        SELECT * FROM cortes_diarios
+        WHERE syncEstado IN (:estados)
+        ORDER BY creadoEn ASC
+    """)
+    suspend fun obtenerListaPorEstadosSync(estados: List<String>): List<CorteDiarioEntity>
 }

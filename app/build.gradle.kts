@@ -70,11 +70,13 @@ dependencies {
     implementation(libs.androidx.material3)
 
     implementation(libs.androidx.navigation.compose.android)
+    implementation(libs.androidx.work.runtime.ktx)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.google.play.services.auth)
+
 
     implementation(libs.google.api.client.android) {
         exclude(group = "org.apache.httpcomponents")

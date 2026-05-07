@@ -157,6 +157,13 @@ fun CorteScreen(
             onCancelar = viewModel::cancelarConfirmacionCorte
         )
     }
+    if (uiState.mostrarModalSinInternet) {
+        DialogSinInternetCorte(
+            mensaje = uiState.mensajeModalSinInternet
+                ?: "No hay internet. El corte quedó pendiente de respaldo.",
+            onAceptar = viewModel::cerrarModalSinInternet
+        )
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -665,6 +672,58 @@ private fun BarraAccionCorte(
         }
     }
 }
+@Composable
+private fun DialogSinInternetCorte(
+    mensaje: String,
+    onAceptar: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onAceptar,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        },
+        title = {
+            Text(
+                text = "Corte guardado sin internet",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Text(
+                text = mensaje,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onAceptar,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Entendido")
+            }
+        }
+    )
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DIÁLOGO DE CONFIRMACIÓN
@@ -777,4 +836,5 @@ private fun DialogConfirmacionCorte(
             }
         }
     )
+
 }

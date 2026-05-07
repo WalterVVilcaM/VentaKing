@@ -24,6 +24,7 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.ventaking.app.dominio.casos.sincronizacion.VerificarConexionUseCase
 
 class CorteViewModel(
     private val negocioDao: NegocioDao,
@@ -34,6 +35,7 @@ class CorteViewModel(
     private val exportarCorteJsonUseCase: ExportarCorteJsonUseCase,
     private val exportarCorteExcelUseCase: ExportarCorteExcelUseCase,
     private val subirArchivosCorteUseCase: SubirArchivosCorteUseCase,
+    private val verificarConexionUseCase: VerificarConexionUseCase,
     private val driveConectado: () -> Boolean,
     private val solicitarConexionDrive: () -> Unit
 ) : ViewModel() {
@@ -263,6 +265,21 @@ class CorteViewModel(
 
                     when (resultadoExportacion) {
                         is ResultadoExportacionLocal.Exito -> {
+                            if (!verificarConexionUseCase()) {
+                                _uiState.update {
+                                    it.copy(
+                                        creandoCorte = false,
+                                        corteExistenteId = resultado.corte.id,
+                                        mensajeExito = "Corte creado y archivos locales generados. Quedó pendiente de respaldo.",
+                                        mensajeError = null,
+                                        mostrarModalSinInternet = true,
+                                        mensajeModalSinInternet = "No hay internet en este momento. El corte se guardó correctamente en el teléfono y aparecerá en Sincronización para reintentarlo después."
+                                    )
+                                }
+
+                                return@launch
+                            }
+
                             if (driveConectado()) {
                                 when (val resultadoDrive = subirArchivosCorteUseCase(resultado.corte.id)) {
                                     is ResultadoSubidaCorte.Exito -> {
@@ -352,6 +369,19 @@ class CorteViewModel(
     fun respaldarCorteActualEnDrive() {
         val corteId = _uiState.value.corteExistenteId ?: return
 
+        if (!verificarConexionUseCase()) {
+            _uiState.update {
+                it.copy(
+                    creandoCorte = false,
+                    mensajeExito = null,
+                    mensajeError = "No hay internet. El corte sigue pendiente de respaldo.",
+                    mostrarModalSinInternet = true,
+                    mensajeModalSinInternet = "No hay internet en este momento. El respaldo se podrá reintentar desde la pantalla de Sincronización."
+                )
+            }
+            return
+        }
+
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -433,5 +463,14 @@ class CorteViewModel(
     private sealed class ResultadoExportacionLocal {
         data object Exito : ResultadoExportacionLocal()
         data class Error(val mensaje: String) : ResultadoExportacionLocal()
+    }
+
+    fun cerrarModalSinInternet() {
+        _uiState.update { estado ->
+            estado.copy(
+                mostrarModalSinInternet = false,
+                mensajeModalSinInternet = null
+            )
+        }
     }
 }

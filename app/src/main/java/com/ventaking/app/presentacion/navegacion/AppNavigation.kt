@@ -7,16 +7,17 @@ import androidx.navigation.compose.rememberNavController
 import com.ventaking.app.presentacion.pantallas.configuracion.ConfiguracionScreen
 import com.ventaking.app.presentacion.pantallas.configuracion.ConfiguracionViewModel
 import com.ventaking.app.presentacion.pantallas.corte.CorteScreen
+import com.ventaking.app.presentacion.pantallas.corte.CorteViewModel
 import com.ventaking.app.presentacion.pantallas.historial.HistorialScreen
 import com.ventaking.app.presentacion.pantallas.inicio.InicioScreen
 import com.ventaking.app.presentacion.pantallas.productos.ProductosScreen
 import com.ventaking.app.presentacion.pantallas.productos.ProductosViewModel
 import com.ventaking.app.presentacion.pantallas.sincronizacion.SincronizacionScreen
+import com.ventaking.app.presentacion.pantallas.sincronizacion.SincronizacionViewModel
 import com.ventaking.app.presentacion.pantallas.venta.VentaScreen
 import com.ventaking.app.presentacion.pantallas.venta.VentaViewModel
 import com.ventaking.app.presentacion.pantallas.ventas_dia.VentasDiaScreen
 import com.ventaking.app.presentacion.pantallas.ventas_dia.VentasDiaViewModel
-import com.ventaking.app.presentacion.pantallas.corte.CorteViewModel
 
 @Composable
 fun AppNavigation(
@@ -24,8 +25,8 @@ fun AppNavigation(
     productosViewModel: ProductosViewModel,
     ventaViewModel: VentaViewModel,
     ventasDiaViewModel: VentasDiaViewModel,
-    corteViewModel: CorteViewModel
-
+    corteViewModel: CorteViewModel,
+    sincronizacionViewModel: SincronizacionViewModel
 ) {
     val navController = rememberNavController()
 
@@ -105,6 +106,7 @@ fun AppNavigation(
 
         composable(Rutas.Sincronizacion.ruta) {
             SincronizacionScreen(
+                viewModel = sincronizacionViewModel,
                 onVolver = {
                     navController.popBackStack()
                 }

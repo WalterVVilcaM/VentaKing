@@ -59,6 +59,10 @@ import com.ventaking.app.datos.repositorio.SincronizacionRepositoryImpl
 import com.ventaking.app.dominio.casos.sincronizacion.SubirArchivosCorteUseCase
 import com.ventaking.app.nucleo.constantes.GoogleDriveConfig
 import java.util.Collections
+import com.ventaking.app.dominio.casos.sincronizacion.ReintentarSincronizacionUseCase
+import com.ventaking.app.dominio.casos.sincronizacion.VerificarConexionUseCase
+import com.ventaking.app.nucleo.red.MonitorConexion
+import com.ventaking.app.presentacion.pantallas.sincronizacion.SincronizacionViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -305,12 +309,38 @@ class MainActivity : ComponentActivity() {
             exportarCorteJsonUseCase = exportarCorteJsonUseCase,
             exportarCorteExcelUseCase = exportarCorteExcelUseCase,
             subirArchivosCorteUseCase = subirArchivosCorteUseCase,
+            verificarConexionUseCase = verificarConexionUseCase,
             driveConectado = {
                 driveServiceProvider.estaConectado()
             },
             solicitarConexionDrive = {
                 solicitarConexionDrive()
             }
+        )
+    }
+
+    private val monitorConexion: MonitorConexion by lazy {
+        MonitorConexion(applicationContext)
+    }
+
+    private val verificarConexionUseCase: VerificarConexionUseCase by lazy {
+        VerificarConexionUseCase(
+            monitorConexion = monitorConexion
+        )
+    }
+
+    private val reintentarSincronizacionUseCase: ReintentarSincronizacionUseCase by lazy {
+        ReintentarSincronizacionUseCase(
+            sincronizacionRepository = sincronizacionRepository,
+            verificarConexionUseCase = verificarConexionUseCase
+        )
+    }
+
+    private val sincronizacionViewModel: SincronizacionViewModel by lazy {
+        SincronizacionViewModel(
+            appContext = applicationContext,
+            sincronizacionRepository = sincronizacionRepository,
+            reintentarSincronizacionUseCase = reintentarSincronizacionUseCase
         )
     }
 
@@ -328,7 +358,8 @@ class MainActivity : ComponentActivity() {
                     productosViewModel = productosViewModel,
                     ventaViewModel = ventaViewModel,
                     ventasDiaViewModel = ventasDiaViewModel,
-                    corteViewModel = corteViewModel
+                    corteViewModel = corteViewModel,
+                    sincronizacionViewModel = sincronizacionViewModel
                 )
             }
         }
