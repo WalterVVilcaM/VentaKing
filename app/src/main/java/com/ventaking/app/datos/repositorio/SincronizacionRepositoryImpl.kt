@@ -6,12 +6,12 @@ import com.ventaking.app.datos.local.dao.CorteDiarioDao
 import com.ventaking.app.datos.local.dao.DispositivoDao
 import com.ventaking.app.datos.local.dao.RegistroArchivoSyncDao
 import com.ventaking.app.datos.local.entidades.RegistroArchivoSyncEntity
+import com.ventaking.app.dominio.repositorio.CortePendienteSync
 import com.ventaking.app.dominio.repositorio.ResultadoSubidaCorte
 import com.ventaking.app.dominio.repositorio.SincronizacionRepository
 import com.ventaking.app.nucleo.constantes.GoogleDriveConfig
 import com.ventaking.app.nucleo.constantes.SyncEstado
 import java.io.File
-import com.ventaking.app.dominio.repositorio.CortePendienteSync
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -55,8 +55,27 @@ class SincronizacionRepositoryImpl(
             return ResultadoSubidaCorte.Error(mensaje)
         }
 
-        if (registros.size < TOTAL_ARCHIVOS_OBLIGATORIOS) {
-            val mensaje = "El corte no tiene los tres archivos obligatorios para subir a Drive."
+        val registrosParaSubir = obtenerRegistrosParaSubir(registros)
+
+        if (registrosParaSubir.isEmpty()) {
+            val mensaje = "El corte no tiene archivos válidos para subir a Drive."
+
+            corteDiarioDao.actualizarSyncEstado(
+                corteId = corteId,
+                syncEstado = SyncEstado.SYNC_ERROR,
+                sincronizadoEn = null,
+                mensajeError = mensaje
+            )
+
+            return ResultadoSubidaCorte.Error(mensaje)
+        }
+
+        val tieneZipProtegido = registrosParaSubir.any {
+            it.tipoArchivo == TipoArchivo.CORTE_ZIP_PROTEGIDO
+        }
+
+        if (!tieneZipProtegido && registrosParaSubir.size < TOTAL_ARCHIVOS_OBLIGATORIOS_LEGACY) {
+            val mensaje = "El corte no tiene ZIP protegido ni los tres archivos obligatorios para subir a Drive."
 
             corteDiarioDao.actualizarSyncEstado(
                 corteId = corteId,
@@ -80,7 +99,7 @@ class SincronizacionRepositoryImpl(
             }
         }
 
-        val carpetaNegocioNombre = obtenerCarpetaNegocio(registros.first())
+        val carpetaNegocioNombre = obtenerCarpetaNegocio(registrosParaSubir.first())
 
         val carpetaNegocioId = when (
             val resultado = driveDataSource.obtenerOCrearCarpeta(
@@ -95,7 +114,7 @@ class SincronizacionRepositoryImpl(
             }
         }
 
-        val fechaCorte = registros.first().fechaCorte
+        val fechaCorte = registrosParaSubir.first().fechaCorte
 
         val carpetaFechaId = when (
             val resultado = driveDataSource.obtenerOCrearCarpeta(
@@ -114,7 +133,7 @@ class SincronizacionRepositoryImpl(
         var archivosOmitidos = 0
         val errores = mutableListOf<String>()
 
-        registros.forEach { registro ->
+        registrosParaSubir.forEach { registro ->
             if (registro.syncEstado == SyncEstado.SYNCED && registro.driveFileId != null) {
                 archivosOmitidos++
                 return@forEach
@@ -256,6 +275,24 @@ class SincronizacionRepositoryImpl(
         }
     }
 
+    private fun obtenerRegistrosParaSubir(
+        registros: List<RegistroArchivoSyncEntity>
+    ): List<RegistroArchivoSyncEntity> {
+        val zipProtegido = registros.firstOrNull {
+            it.tipoArchivo == TipoArchivo.CORTE_ZIP_PROTEGIDO
+        }
+
+        if (zipProtegido != null) {
+            return listOf(zipProtegido)
+        }
+
+        return registros.filter { registro ->
+            registro.tipoArchivo == TipoArchivo.VENTAS_JSON ||
+                    registro.tipoArchivo == TipoArchivo.CORTE_JSON ||
+                    registro.tipoArchivo == TipoArchivo.CORTE_EXCEL
+        }
+    }
+
     private suspend fun marcarCorteConError(
         corteId: String,
         mensaje: String
@@ -280,7 +317,14 @@ class SincronizacionRepositoryImpl(
             ?: registro.negocioId
     }
 
+    private object TipoArchivo {
+        const val VENTAS_JSON = "VENTAS_JSON"
+        const val CORTE_JSON = "CORTE_JSON"
+        const val CORTE_EXCEL = "CORTE_EXCEL"
+        const val CORTE_ZIP_PROTEGIDO = "CORTE_ZIP_PROTEGIDO"
+    }
+
     private companion object {
-        const val TOTAL_ARCHIVOS_OBLIGATORIOS = 3
+        const val TOTAL_ARCHIVOS_OBLIGATORIOS_LEGACY = 3
     }
 }

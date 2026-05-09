@@ -155,7 +155,7 @@ class MainActivity : ComponentActivity() {
             AppDatabase::class.java,
             "ventaking_db"
         )
-            .fallbackToDestructiveMigration()
+//            .fallbackToDestructiveMigration()
             .build()
     }
 

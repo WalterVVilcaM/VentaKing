@@ -77,6 +77,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PANTALLA PRINCIPAL
@@ -93,6 +94,13 @@ fun VentaScreen(
 
     LaunchedEffect(uiState.negocioSeleccionadoId) {
         viewModel.refrescarEstadoCorte()
+    }
+
+    LaunchedEffect(uiState.mensajeExito) {
+        if (uiState.mensajeExito != null) {
+            delay(1100)
+            viewModel.limpiarMensajes()
+        }
     }
 
     Scaffold(
@@ -762,7 +770,7 @@ private fun BotonVentaConPulsoVerde(
 
     val textoBoton = when {
         guardando -> "REGISTRANDO..."
-        exito     -> "VENTA EXITOSA - NUEVA"
+        exito     -> "VENTA GUARDADA"
         else      -> "REGISTRAR VENTA"
     }
 
@@ -770,7 +778,7 @@ private fun BotonVentaConPulsoVerde(
         onClick = {
             when {
                 guardando -> Unit
-                exito     -> onNuevaVenta()
+                exito     -> Unit
                 else      -> onRegistrar()
             }
         },

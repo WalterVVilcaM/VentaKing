@@ -9,6 +9,7 @@ import com.ventaking.app.datos.local.dao.RegistroArchivoSyncDao
 import com.ventaking.app.datos.local.dao.VentaDao
 import com.ventaking.app.datos.local.entidades.RegistroArchivoSyncEntity
 import com.ventaking.app.datos.respaldo.GeneradorJson
+import com.ventaking.app.datos.respaldo.GeneradorZipProtegido
 import com.ventaking.app.dominio.modelo.ArchivoExportado
 import com.ventaking.app.dominio.repositorio.ExportacionRepository
 import com.ventaking.app.dominio.repositorio.ResultadoExportacion
@@ -29,6 +30,8 @@ class ExportacionRepositoryImpl(
     private val generadorJson: GeneradorJson,
     private val generadorExcel: GeneradorExcel
 ) : ExportacionRepository {
+
+    private val generadorZipProtegido = GeneradorZipProtegido()
 
     override suspend fun exportarVentasJson(corteId: String): ResultadoExportacion {
         return try {
@@ -168,7 +171,7 @@ class ExportacionRepositoryImpl(
                 hashArchivo = hash
             )
 
-            guardarArchivoYRegistro(
+            val resultadoExcel = guardarArchivoYRegistro(
                 corteId = corteId,
                 negocioId = datos.corte.negocioId,
                 dispositivoId = datos.corte.dispositivoId,
@@ -179,9 +182,104 @@ class ExportacionRepositoryImpl(
                 hashArchivo = calcularHash(bytesFinales),
                 negocioNombre = datos.negocio.nombre
             )
+
+            when (resultadoExcel) {
+                is ResultadoExportacion.Error -> resultadoExcel
+
+                is ResultadoExportacion.Exito -> {
+                    when (
+                        val resultadoZip = crearZipProtegidoDelCorte(
+                            corteId = corteId,
+                            datos = datos
+                        )
+                    ) {
+                        is ResultadoExportacion.Exito -> resultadoExcel
+                        is ResultadoExportacion.Error -> resultadoZip
+                    }
+                }
+            }
         } catch (e: Exception) {
             ResultadoExportacion.Error(
                 mensaje = e.message ?: "No se pudo exportar corte Excel."
+            )
+        }
+    }
+
+    private suspend fun crearZipProtegidoDelCorte(
+        corteId: String,
+        datos: DatosExportacion
+    ): ResultadoExportacion {
+        return try {
+            val registros = registroArchivoSyncDao.obtenerPorCorte(corteId)
+
+            val archivoVentas = registros
+                .firstOrNull { it.tipoArchivo == TipoArchivo.VENTAS_JSON }
+                ?.let { File(it.rutaLocal) }
+
+            val archivoCorte = registros
+                .firstOrNull { it.tipoArchivo == TipoArchivo.CORTE_JSON }
+                ?.let { File(it.rutaLocal) }
+
+            val archivoExcel = registros
+                .firstOrNull { it.tipoArchivo == TipoArchivo.CORTE_EXCEL }
+                ?.let { File(it.rutaLocal) }
+
+            if (archivoVentas == null || archivoCorte == null || archivoExcel == null) {
+                return ResultadoExportacion.Error(
+                    "No se pudo crear el ZIP protegido porque faltan archivos del corte."
+                )
+            }
+
+            if (!archivoVentas.exists() || !archivoCorte.exists() || !archivoExcel.exists()) {
+                return ResultadoExportacion.Error(
+                    "No se pudo crear el ZIP protegido porque uno o más archivos locales no existen."
+                )
+            }
+
+            val nombreZip = construirNombreZipProtegido(
+                negocioNombre = datos.negocio.nombre,
+                fechaCorte = datos.corte.fechaCorte,
+                dispositivoNombre = datos.dispositivo.nombreDispositivo,
+                dispositivoId = datos.dispositivo.id
+            )
+
+            val carpetaDestino = obtenerCarpetaDestino(
+                negocioNombre = datos.negocio.nombre,
+                fechaCorte = datos.corte.fechaCorte
+            )
+
+            if (!carpetaDestino.exists()) {
+                carpetaDestino.mkdirs()
+            }
+
+            val archivoZip = File(carpetaDestino, nombreZip)
+
+            generadorZipProtegido.crearZipProtegido(
+                archivoDestino = archivoZip,
+                archivos = listOf(
+                    archivoVentas,
+                    archivoCorte,
+                    archivoExcel
+                ),
+                password = CLAVE_ZIP_RESPALDO
+            )
+
+            val bytesZip = archivoZip.readBytes()
+
+            guardarArchivoYRegistro(
+                corteId = corteId,
+                negocioId = datos.corte.negocioId,
+                dispositivoId = datos.corte.dispositivoId,
+                fechaCorte = datos.corte.fechaCorte,
+                tipoArchivo = TipoArchivo.CORTE_ZIP_PROTEGIDO,
+                nombreArchivo = nombreZip,
+                bytes = bytesZip,
+                hashArchivo = calcularHash(bytesZip),
+                negocioNombre = datos.negocio.nombre
+            )
+        } catch (e: Exception) {
+            ResultadoExportacion.Error(
+                mensaje = e.message ?: "No se pudo crear el ZIP protegido del corte."
             )
         }
     }
@@ -286,6 +384,23 @@ class ExportacionRepositoryImpl(
         return "${negocio}_${fechaCorte}_${dispositivoCorto}_${corteCorto}_${tipo}.$extension"
     }
 
+    private fun construirNombreZipProtegido(
+        negocioNombre: String,
+        fechaCorte: String,
+        dispositivoNombre: String?,
+        dispositivoId: String
+    ): String {
+        val negocio = normalizarParaArchivo(negocioNombre)
+
+        val dispositivoVisible = dispositivoNombre
+            ?.takeIf { it.isNotBlank() }
+            ?: dispositivoId.take(8)
+
+        val dispositivo = normalizarParaArchivo(dispositivoVisible)
+
+        return "${negocio}_${fechaCorte}_${dispositivo}_corte_protegido.zip"
+    }
+
     private fun calcularHash(bytes: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-256")
         val hash = digest.digest(bytes)
@@ -334,5 +449,10 @@ class ExportacionRepositoryImpl(
         const val VENTAS_JSON = "VENTAS_JSON"
         const val CORTE_JSON = "CORTE_JSON"
         const val CORTE_EXCEL = "CORTE_EXCEL"
+        const val CORTE_ZIP_PROTEGIDO = "CORTE_ZIP_PROTEGIDO"
+    }
+
+    private companion object {
+        const val CLAVE_ZIP_RESPALDO = "bigotito16"
     }
 }

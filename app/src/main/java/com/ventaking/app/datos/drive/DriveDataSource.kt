@@ -164,8 +164,13 @@ class DriveDataSource(
     private fun obtenerMimeType(nombreArchivo: String): String {
         return when {
             nombreArchivo.endsWith(".json", ignoreCase = true) -> "application/json"
+
             nombreArchivo.endsWith(".xlsx", ignoreCase = true) ->
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+            nombreArchivo.endsWith(".zip", ignoreCase = true) ->
+                "application/zip"
+
             else -> "application/octet-stream"
         }
     }

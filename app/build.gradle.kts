@@ -90,6 +90,7 @@ dependencies {
         exclude(group = "org.apache.httpcomponents")
     }
     ksp(libs.androidx.room.compiler)
+    implementation("net.lingala.zip4j:zip4j:2.11.6")
 
     testImplementation(libs.junit)
 

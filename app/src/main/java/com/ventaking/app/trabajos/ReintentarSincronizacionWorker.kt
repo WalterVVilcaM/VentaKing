@@ -41,7 +41,7 @@ class ReintentarSincronizacionWorker(
             AppDatabase::class.java,
             "ventaking_db"
         )
-            .fallbackToDestructiveMigration()
+//            .fallbackToDestructiveMigration()
             .build()
 
         return try {
